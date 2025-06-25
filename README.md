@@ -14,7 +14,7 @@ A comprehensive 5G network planning and optimization tool developed by the Facul
 
 ## 🚀 Live Demo
 
-Access the application at: [5G Site Estimator](https://your-app-url.streamlit.app)
+Access the application at: [5G Site Estimator](https://5g-planning-bot.streamlit.app/)
 
 ## 📊 Screenshots
 
