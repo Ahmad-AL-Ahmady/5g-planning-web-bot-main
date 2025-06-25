@@ -198,7 +198,7 @@ st.sidebar.markdown("**📏 Area & Population**")
 area_km2 = st.sidebar.number_input("Area Size (km²)", min_value=0.1, value=0.5, step=0.1)
 population = st.sidebar.number_input("Population", min_value=0, value=10000, step=1000)
 penetration_rate = st.sidebar.slider("5G Penetration Rate (%)", 0, 100, 30)
-traffic_per_user = st.sidebar.number_input("Average Traffic per User (Mbps)", min_value=0.0, value=5.0, step=0.1)
+traffic_per_user = st.sidebar.number_input("Total Traffic(Mbps)", min_value=0.0, value=5.0, step=0.1)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📡 Antenna Configuration**")
@@ -223,19 +223,35 @@ freq_ghz = freq_mhz / 1000
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📡 Link Budget Parameters**")
+use_custom_mapl = st.sidebar.checkbox("Use Custom MAPL", value=False)
 use_custom_link_budget = st.sidebar.checkbox("Customize Link Budget Parameters", value=False)
 
-if use_custom_link_budget:
+if use_custom_mapl:
+    custom_mapl = st.sidebar.number_input("Custom MAPL (dB)", value=130.0, min_value=80.0, max_value=180.0, step=0.1)
+    # Set default values for other parameters when using custom MAPL
+    tx_power = 49
+    tx_gain = 24
+    cable_loss = 0
+    penetration_loss = 24
+    foliage_loss = 11
+    body_loss = 3
+    interference_margin = 6
+    rain_margin = 0
+    shadow_margin = 7
+    rx_gain = 24
+    noise_figure = 9
+    required_sinr = 14
+elif use_custom_link_budget:
     tx_power = st.sidebar.number_input("Tx Power (dBm)", value=49)
     tx_gain = st.sidebar.number_input("Tx Antenna Gain (dBi)", value=24)
     cable_loss = st.sidebar.number_input("Cable Loss (dB)", value=0)
-    penetration_loss = st.sidebar.number_input("Penetration Loss (dB)", value=22)
-    foliage_loss = st.sidebar.number_input("Foliage Loss (dB)", value=7.5)
+    penetration_loss = st.sidebar.number_input("Penetration Loss (dB)", value=24)
+    foliage_loss = st.sidebar.number_input("Foliage Loss (dB)", value=11)
     body_loss = st.sidebar.number_input("Body Loss (dB)", value=3)
     interference_margin = st.sidebar.number_input("Interference Margin (dB)", value=6)
     rain_margin = st.sidebar.number_input("Rain Margin (dB)", value=0)
-    shadow_margin = st.sidebar.number_input("Shadow Margin (dB)", value=6)
-    rx_gain = st.sidebar.number_input("Rx Antenna Gain (dBi)", value=0)
+    shadow_margin = st.sidebar.number_input("Shadow Margin (dB)", value=7)
+    rx_gain = st.sidebar.number_input("Rx Antenna Gain (dBi)", value=24)
     noise_figure = st.sidebar.number_input("Receiver Noise Figure (dB)", value=9)
     required_sinr = st.sidebar.number_input("Required SINR (dB)", value=14)
 else:
@@ -256,10 +272,15 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("**⚙️ Capacity Parameters**")
 bandwidth_mhz = int(st.sidebar.selectbox("Bandwidth (MHz)", options=[10, 20, 40, 60, 80, 100], index=3))
 mod_order = st.sidebar.selectbox("Modulation Order (bits per symbol)", options=[2, 4, 6, 8, 10], index=3)
-mimo_layers = st.sidebar.slider("Number of MIMO Layers", min_value=1, max_value=16, value=4)
+mimo_layers = st.sidebar.slider("Number of MIMO Layers", min_value=1, max_value=32, value=4)
 utilization = st.sidebar.slider("Resource Utilization (%)", min_value=0, max_value=100, value=70) / 100.0
 overhead = st.sidebar.slider("Overhead (%)", min_value=0, max_value=100, value=25) / 100.0
 sectors_per_site = st.sidebar.selectbox("Sectors per Site", options=[1, 3], index=1)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("**📶 Sub-Carrier Spacing**")
+scs_khz = st.sidebar.selectbox("Sub-Carrier Spacing (kHz)", options=[15, 30, 60, 120, 240], index=1)
+scs_hz = scs_khz * 1000  # Convert to Hz
 
 duplex_mode = st.sidebar.selectbox("Duplex Mode", ["TDD", "FDD"], index=0)
 if duplex_mode == "FDD":
@@ -267,10 +288,30 @@ if duplex_mode == "FDD":
 
 propagation_model = st.sidebar.selectbox("Select Propagation Model", ["UMi-Street Canyon", "UMa"])
 
-# Resource block table
-rb_table = {10: 52, 20: 106, 40: 217, 60: 326, 80: 435, 100: 546}
-n_rb = rb_table.get(bandwidth_mhz, 217)
+# Calculate number of Resource Blocks dynamically based on bandwidth and SCS
 bandwidth_hz = bandwidth_mhz * 1e6
+n_rb = int(bandwidth_hz / (12 * scs_hz))
+
+# Calculate MAPL (Maximum Allowable Path Loss)
+thermal_noise = -174 + 10 * math.log10(bandwidth_hz)
+receiver_sensitivity = thermal_noise + noise_figure + required_sinr
+
+if use_custom_mapl:
+    mapl = custom_mapl
+else:
+    mapl = (tx_power + tx_gain + rx_gain - cable_loss - penetration_loss - foliage_loss - body_loss
+            - interference_margin - rain_margin - shadow_margin - receiver_sensitivity)
+
+# Display calculated RB information
+st.sidebar.markdown("---")
+st.sidebar.markdown("**📊 Calculated Parameters**")
+st.sidebar.info(f"**Resource Blocks:** {n_rb - math.floor(n_rb*0.05)}")
+st.sidebar.info(f"**Total Subcarriers:** {n_rb * 12:,}")
+st.sidebar.info(f"**Effective Bandwidth:** {(n_rb * 12 * scs_khz / 1000):.2f} MHz")
+if use_custom_mapl:
+    st.sidebar.info(f"**MAPL:** {mapl:.1f} dB (Custom)")
+else:
+    st.sidebar.info(f"**MAPL:** {mapl:.1f} dB (Calculated)")
 
 def pl_umi(d_m, f_ghz, h_ue=1.5):
     d_km = d_m / 1000.0
@@ -310,12 +351,7 @@ def find_coverage_radius(link_budget_margin, f_ghz, model_func, max_radius_km=0.
 
 # Enhanced results section
 if st.button("🚀 Calculate 5G Network Requirements", use_container_width=True):
-    # Calculations
-    thermal_noise = -174 + 10 * math.log10(bandwidth_hz)
-    receiver_sensitivity = thermal_noise + noise_figure + required_sinr
-
-    mapl = (tx_power + tx_gain + rx_gain - cable_loss - penetration_loss - foliage_loss - body_loss
-            - interference_margin - rain_margin - shadow_margin - receiver_sensitivity)
+    # Use already calculated values
 
     model_func = pl_umi if propagation_model == "UMi-Street Canyon" else pl_uma
     coverage_radius_km = find_coverage_radius(mapl, freq_ghz, model_func)
@@ -324,7 +360,7 @@ if st.button("🚀 Calculate 5G Network Requirements", use_container_width=True)
     num_sites_coverage = math.ceil(area_km2 / a_site)
 
     active_users = population * (penetration_rate / 100)
-    total_traffic_mbps = active_users * traffic_per_user
+    total_traffic_mbps = traffic_per_user
 
     bps_per_sector = (
         n_rb * 12 * 14 * 1000 * mod_order * 0.93 * mimo_layers * utilization * (1 - overhead)
@@ -460,13 +496,6 @@ if st.button("🚀 Calculate 5G Network Requirements", use_container_width=True)
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Traffic per User</div>
-            <div class="metric-value">{traffic_per_user:.1f} Mbps</div>
-            <small>Average user demand</small>
-        </div>
-        """, unsafe_allow_html=True)
     
     with col3:
         st.markdown("#### 🏗️ Infrastructure Requirements")
