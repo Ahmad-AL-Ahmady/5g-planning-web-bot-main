@@ -199,6 +199,8 @@ area_km2 = st.sidebar.number_input("Area Size (km²)", min_value=0.1, value=0.5,
 population = st.sidebar.number_input("Population", min_value=0, value=10000, step=1000)
 penetration_rate = st.sidebar.slider("5G Penetration Rate (%)", 0, 100, 30)
 traffic_per_user = st.sidebar.number_input("Total Traffic(Mbps)", min_value=0.0, value=5.0, step=0.1)
+downlink_ratio = st.sidebar.slider("Downlink Traffic Ratio (%)", 10, 100, 75) / 100.0
+q = st.sidebar.slider("Quality Factor (q)", 0.1, 1.0, 0.8, step=0.01)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📡 Antenna Configuration**")
@@ -363,11 +365,11 @@ if st.button("🚀 Calculate 5G Network Requirements", use_container_width=True)
     total_traffic_mbps = traffic_per_user
 
     bps_per_sector = (
-        n_rb * 12 * 14 * 1000 * mod_order * 0.93 * mimo_layers * utilization * (1 - overhead)
+        n_rb * 14 * 4000 * mod_order * 0.93 * mimo_layers * utilization * (1 - overhead)
     )
-    site_throughput_mbps = (bps_per_sector * sectors_per_site) / 1e6
+    site_throughput_mbps = (bps_per_sector * sectors_per_site * downlink_ratio * q) / 1e6
     num_sites_capacity = math.ceil(total_traffic_mbps / site_throughput_mbps) if site_throughput_mbps > 0 else 0
-    total_sites_required = max(num_sites_coverage, num_sites_capacity)
+    total_sites_required = max(num_sites_coverage, num_sites_capacity) 
     
     # Enhanced Results Display
     st.markdown('<div class="results-container">', unsafe_allow_html=True)
